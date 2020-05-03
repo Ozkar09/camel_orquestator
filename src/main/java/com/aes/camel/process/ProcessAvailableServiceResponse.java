@@ -11,11 +11,13 @@ public class ProcessAvailableServiceResponse implements Processor {
     @Override
     public void process(Exchange exchange) throws Exception {
 
-        InputStream availableServices = exchange.getIn().getBody(InputStream.class);
+        String availableServices = exchange.getIn().getBody(String.class);
 
+        boolean availableService = availableServices.contains(exchange.getIn().getHeader("servicetype", String.class));
 
+        System.out.println("SERVICIO DISPONIBLE ------> " + availableService);
 
-        System.out.println("ESTE ES EL BODY EN EL PROCESS INPUTSTREAM = " + availableServices);
-        System.out.println("ESTE ES EL BODY EN EL PROCESS = " +  exchange.getIn().getBody());
+        exchange.getIn().setHeader("AVAILABLE_SERVICE", ""+availableService);
+
     }
 }

@@ -13,7 +13,7 @@ import org.apache.camel.component.jackson.ListJacksonDataFormat;
 public class MyRouteBuilder extends RouteBuilder {
 
     private JacksonDataFormat jsonPayment = new JacksonDataFormat(Payment.class);
-    private JacksonDataFormat jsonAvailableServices = new ListJacksonDataFormat(AvailableService.class);
+    private JacksonDataFormat jsonWaterServiceResponse = new JacksonDataFormat(WaterInvoice.class);
 
     private static final String USER_VALIDATION_URL = "http://localhost:9191/api/login/login";
     private static final String WATER_SERVICE_URL = "http://127.0.0.1:9090/servicios/pagos/v1/payments";
@@ -56,15 +56,19 @@ public class MyRouteBuilder extends RouteBuilder {
                             .when().simple( "${body}")
                                 .setHeader("TRANSACTION_TYPE", constant(QUERY_TRANSACTION_TYPE))
                                 .to("direct:processValidateAvailableServices")
+                                .log("YA VALIDA DISPONIBILIDAD SERVICIO ${header.AVAILABLE_SERVICE}")
                                 .choice()
                                     .when(header("AVAILABLE_SERVICE").isEqualTo("true"))
+                                        .log("ENTRA A CONSULTAR SERVICIO ${header.serviceType}")
+                                        .log("${header.serviceType} == " + " '" + WATER + "'")
                                         //.when().simple("${header.serviceType} == " + " '" + GAS + "'").to("direct:processGasService")
-                                        .when().simple("${header.serviceType} == " + " '" + WATER + "'").to("direct:processWaterService")
+                                        .when(header("serviceType").isEqualTo("water")).to("direct:processWaterService")
                                         //.when().simple("${header.serviceType} == " + " '" + PHONE + "'").to("direct:processPhoneService")
                                         //.when().simple("${header.serviceType} == " + " '" + ENERGY + "'").to("direct:processEnergyService")
+                                        .log("METE EL HEADER")
                                         .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200))
                                     .otherwise()
-                                            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(503))
+                                        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(503))
                                     .endChoice()
                         .endChoice()
                     .otherwise()
@@ -124,13 +128,16 @@ public class MyRouteBuilder extends RouteBuilder {
                 .log("COMPROBANDO DISPONIBILIDAD DE SERVICIOS")
                 .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
                 .to(AVAILABILITY_SERVICES_URL)
-                .log("BODY ANTES ${body}")
+                //.convertBodyTo(String.class)
                 //.marshal(jsonAvailableServices)
+                .log("BODY ANTES ${body}")
                 .process(new ProcessAvailableServiceResponse())
                 .log("BODY DESPUES ${body}")
                 .end();
 
         from("direct:processWaterService")
+            .log("HOLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 22222222222222222")
+            .log("ACCION ---->  ${header.TRANSACTION_TYPE}")
             .choice()
                 .when().simple("${header.TRANSACTION_TYPE} == " + " '" + QUERY_TRANSACTION_TYPE + "'").to("direct:processQueryWaterService")
                 .when().simple("${header.TRANSACTION_TYPE} == " + " '" + PAYMENT_TRANSACTION_TYPE + "'").to("direct:processPaymentWaterService")
@@ -140,7 +147,14 @@ public class MyRouteBuilder extends RouteBuilder {
         from("direct:processQueryWaterService")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 .process(new WaterServiceProcess())
+                .log("REFERENCIAAAAAAAAAAAAAAAAA ==== ${header.reference}")
                 .to(WATER_SERVICE_URL + "/${header.reference}")
+                .log("BODY CONSUMO AGUA ${body}")
+                .transform(body())
+                //.convertBodyTo(WaterInvoice.class)
+                //.marshal(jsonWaterServiceResponse)
+                .log("SERVICIO DE AGUA CONSUMIDO")
+                //.process(new WaterResponseServiceProcess())
         .end();
 
         from("direct:processPaymentWaterService")
