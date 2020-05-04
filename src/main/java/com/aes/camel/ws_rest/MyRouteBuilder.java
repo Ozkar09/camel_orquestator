@@ -146,8 +146,6 @@ public class MyRouteBuilder extends RouteBuilder {
 
         from("direct:processGasService")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
-                //.to("http://localhost:8082/api/v1/test")
-                //.unmarshal(jsonUser)
                 .process(new ProcessDataResponseUserValidator())
                 .end();
 
