@@ -149,7 +149,7 @@ public class MyRouteBuilder extends RouteBuilder {
                 .process(new WaterServiceProcess())
                 .log("REFERENCIAAAAAAAAAAAAAAAAA ==== ${header.reference}")
                 .to(WATER_SERVICE_URL + "/${header.reference}")
-                .log("BODY CONSUMO AGUA ${body}")
+                .setBody(simple(String.valueOf("${body}")))
                 .transform(body())
                 //.convertBodyTo(WaterInvoice.class)
                 //.marshal(jsonWaterServiceResponse)
