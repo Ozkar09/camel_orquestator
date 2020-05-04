@@ -13,6 +13,8 @@ public class MyRouteBuilder extends RouteBuilder {
 
     private static final String USER_VALIDATION_URL = "http://localhost:9191/api/login/login";
     private static final String WATER_SERVICE_URL = "http://127.0.0.1:9090/servicios/pagos/v1/payments";
+    private static final String PHONE_SERVICE_URL = "http://localhost:8085/phoneBills";
+    private static final String ENERGY_SERVICE_URL = "http://localhost:8085/electricityBills";
     private static final String AVAILABILITY_SERVICES_URL = "http://localhost:8082/services";
 
     private static final String GAS = "gas";
@@ -127,18 +129,17 @@ public class MyRouteBuilder extends RouteBuilder {
                 .end();
 
         from("direct:processPhoneService")
-                .log("LLEGA AL PHONE")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
-                //.to("http://localhost:8082/api/v1/test")
-                //.unmarshal(jsonUser)
-                .process(new ProcessDataResponseUserValidator())
+                .process(new PhoneServiceProcess())
+                .to(PHONE_SERVICE_URL + "/${header.reference}")
+                .setBody(simple(String.valueOf("${body}")))
                 .end();
 
         from("direct:processEnergyService")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
-                //.to("http://localhost:8082/api/v1/test")
-                //.unmarshal(jsonUser)
-                .process(new ProcessDataResponseUserValidator())
+                .process(new EnergyServiceProcess())
+                .to(ENERGY_SERVICE_URL + "/${header.reference}")
+                .setBody(simple(String.valueOf("${body}")))
                 .end();
 
         from("direct:processGasService")
