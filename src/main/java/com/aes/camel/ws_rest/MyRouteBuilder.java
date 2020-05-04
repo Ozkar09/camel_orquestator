@@ -1,19 +1,15 @@
 package com.aes.camel.ws_rest;
 
 import com.aes.camel.business.PredicateProcessor;
-import com.aes.camel.pojo.AvailableService;
 import com.aes.camel.pojo.Payment;
-import com.aes.camel.pojo.WaterInvoice;
 import com.aes.camel.process.*;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
-import org.apache.camel.component.jackson.ListJacksonDataFormat;
 
 public class MyRouteBuilder extends RouteBuilder {
 
     private JacksonDataFormat jsonPayment = new JacksonDataFormat(Payment.class);
-    private JacksonDataFormat jsonWaterServiceResponse = new JacksonDataFormat(WaterInvoice.class);
 
     private static final String USER_VALIDATION_URL = "http://localhost:9191/api/login/login";
     private static final String WATER_SERVICE_URL = "http://127.0.0.1:9090/servicios/pagos/v1/payments";
@@ -43,6 +39,8 @@ public class MyRouteBuilder extends RouteBuilder {
          * Definición de recursos de acceso
          */
         rest("aes/mod_val/v1")
+                .post("/invoice")
+                .to("direct:processPaymentInvoice")
                 .get("/invoice?userName={userName}&password={password}&channel={channel}&serviceType={serviceType}&reference={reference}")
                 .route()
                 .to("direct:processRequestInvoice");
@@ -56,17 +54,14 @@ public class MyRouteBuilder extends RouteBuilder {
                             .when().simple( "${body}")
                                 .setHeader("TRANSACTION_TYPE", constant(QUERY_TRANSACTION_TYPE))
                                 .to("direct:processValidateAvailableServices")
-                                .log("YA VALIDA DISPONIBILIDAD SERVICIO ${header.AVAILABLE_SERVICE}")
                                 .choice()
                                     .when(header("AVAILABLE_SERVICE").isEqualTo("true"))
-                                        .log("ENTRA A CONSULTAR SERVICIO ${header.serviceType}")
-                                        .log("${header.serviceType} == " + " '" + WATER + "'")
-                                        //.when().simple("${header.serviceType} == " + " '" + GAS + "'").to("direct:processGasService")
-                                        .when(header("serviceType").isEqualTo("water")).to("direct:processWaterService")
-                                        //.when().simple("${header.serviceType} == " + " '" + PHONE + "'").to("direct:processPhoneService")
-                                        //.when().simple("${header.serviceType} == " + " '" + ENERGY + "'").to("direct:processEnergyService")
-                                        .log("METE EL HEADER")
-                                        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200))
+                                        .choice()
+                                            .when(header("serviceType").isEqualTo("water")).to("direct:processWaterService")
+                                            .when(header("serviceType").isEqualTo("phone")).to("direct:processPhoneService")
+                                            .when(header("serviceType").isEqualTo("energy")).to("direct:processEnergyService")
+                                            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200))
+                                        .endChoice()
                                     .otherwise()
                                         .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(503))
                                     .endChoice()
@@ -74,11 +69,6 @@ public class MyRouteBuilder extends RouteBuilder {
                     .otherwise()
                         .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
                 .end();
-
-        rest("aes/mod_val/v1")
-                .post("/invoice")
-                .route()
-                .to("direct:processPaymentInvoice");
 
         from("direct:processPaymentInvoice")
                 .unmarshal(jsonPayment)
@@ -88,20 +78,7 @@ public class MyRouteBuilder extends RouteBuilder {
                         .to("direct:processUserValidation")
                         .choice()
                             .when(header("VALID_USER").isEqualTo("true")).to("direct:processBalanceAccount")
-                                //.choice()
-                                //    .when(header("SALDO").isGreaterThan(0))
-                                  //      .setHeader("TRANSACTION_TYPE", constant(PAYMENT_TRANSACTION_TYPE))
-                                    //    .choice()
-                                      //      .when().simple("${body.invoice.type} == " + " '" + GAS + "'").to("direct:processGasService")
-                                        //    .when().simple("${body.invoice.type} == " + " '" + WATER + "'").to("direct:processWaterService")
-                                          //  .when().simple("${body.invoice.type} == " + " '" + PHONE + "'").to("direct:processPhoneService")
-                                            //.when().simple("${body.invoice.type} == " + " '" + ENERGY + "'").to("direct:processEnergyService")
-                                            //.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200))
-                                        //.endChoice()
-                                    //.otherwise()
-//                                        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200))
-  //                                      .setBody(body())
-                                //.endChoice()
+                               .log("PAGO REALIZADO")
                             .otherwise()
                                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(401))
                         .endChoice()
@@ -125,21 +102,13 @@ public class MyRouteBuilder extends RouteBuilder {
 
         from("direct:processValidateAvailableServices")
                 .process(new ProcessAvailableServiceRequest())
-                .log("COMPROBANDO DISPONIBILIDAD DE SERVICIOS")
-                .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
                 .to(AVAILABILITY_SERVICES_URL)
-                //.convertBodyTo(String.class)
-                //.marshal(jsonAvailableServices)
-                .log("BODY ANTES ${body}")
                 .process(new ProcessAvailableServiceResponse())
-                .log("BODY DESPUES ${body}")
                 .end();
 
         from("direct:processWaterService")
-            .log("HOLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 22222222222222222")
-            .log("ACCION ---->  ${header.TRANSACTION_TYPE}")
             .choice()
-                .when().simple("${header.TRANSACTION_TYPE} == " + " '" + QUERY_TRANSACTION_TYPE + "'").to("direct:processQueryWaterService")
+                .when(header("TRANSACTION_TYPE").isEqualTo(QUERY_TRANSACTION_TYPE)).to("direct:processQueryWaterService")
                 .when().simple("${header.TRANSACTION_TYPE} == " + " '" + PAYMENT_TRANSACTION_TYPE + "'").to("direct:processPaymentWaterService")
             .endChoice()
         .end();
@@ -147,14 +116,8 @@ public class MyRouteBuilder extends RouteBuilder {
         from("direct:processQueryWaterService")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 .process(new WaterServiceProcess())
-                .log("REFERENCIAAAAAAAAAAAAAAAAA ==== ${header.reference}")
                 .to(WATER_SERVICE_URL + "/${header.reference}")
                 .setBody(simple(String.valueOf("${body}")))
-                .transform(body())
-                //.convertBodyTo(WaterInvoice.class)
-                //.marshal(jsonWaterServiceResponse)
-                .log("SERVICIO DE AGUA CONSUMIDO")
-                //.process(new WaterResponseServiceProcess())
         .end();
 
         from("direct:processPaymentWaterService")
@@ -164,6 +127,7 @@ public class MyRouteBuilder extends RouteBuilder {
                 .end();
 
         from("direct:processPhoneService")
+                .log("LLEGA AL PHONE")
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 //.to("http://localhost:8082/api/v1/test")
                 //.unmarshal(jsonUser)

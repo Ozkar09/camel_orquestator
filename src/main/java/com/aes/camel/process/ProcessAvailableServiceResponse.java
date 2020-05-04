@@ -5,6 +5,7 @@ import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 
 import java.io.InputStream;
+import java.util.List;
 
 public class ProcessAvailableServiceResponse implements Processor {
 
@@ -13,11 +14,11 @@ public class ProcessAvailableServiceResponse implements Processor {
 
         String availableServices = exchange.getIn().getBody(String.class);
 
+        //List<AvailableService> bodyIn = (List<AvailableService>) exchange.getIn().getBody();
+
         boolean availableService = availableServices.contains(exchange.getIn().getHeader("servicetype", String.class));
 
-        System.out.println("SERVICIO DISPONIBLE ------> " + availableService);
-
-        exchange.getIn().setHeader("AVAILABLE_SERVICE", ""+availableService);
+        exchange.getIn().setHeader("AVAILABLE_SERVICE", ""+ availableService);
 
     }
 }
