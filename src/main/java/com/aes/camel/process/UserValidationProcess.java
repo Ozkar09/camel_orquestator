@@ -20,8 +20,6 @@ public class UserValidationProcess implements Processor {
 
         if (transactionType.equals(QUERY_TRANSACTION_TYPE)){
 
-            System.out.println("CHAO");
-
             userName = exchange.getIn().getHeader("userName", String.class);
             password = Integer.parseInt(exchange.getIn().getHeader("password", String.class));
 
